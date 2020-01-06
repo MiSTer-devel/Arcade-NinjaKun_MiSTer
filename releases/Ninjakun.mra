@@ -1,0 +1,29 @@
+<misterromdescription>
+	<name>Ninjakun Majou no Bouken</name>
+	<mameversion>0217</mameversion>
+	<setname>ninjakun</setname>
+	<mratimestamp>20200105004539</mratimestamp>
+	<year>1984</year>
+	<manufacturer>UPL (Taito license)</manufacturer>
+	<category>Fighter / Asian</category>
+	<category>Platform</category>
+	<rbf>ninjakun</rbf>
+	<rom index="0" zip="ninjakun.zip" md5="99e80f22f7a77cf1d574ce89486b385f" type="merged|nonmerged|split">
+		<part name="ninja-6.7n"/>
+		<part name="ninja-7.7p"/>
+		<part name="ninja-8.7s"/>
+		<part name="ninja-9.7t"/>
+		<part name="ninja-10.2c"/>
+		<part name="ninja-11.2d"/>
+		<part name="ninja-12.4c"/>
+		<part name="ninja-13.4d"/>
+		<part name="ninja-1.7a"/>
+		<part name="ninja-2.7b"/>
+		<part name="ninja-3.7d"/>
+		<part name="ninja-4.7e"/>
+		<part name="ninja-5.7h"/>
+		<part name="ninja-2.7b"/>
+		<part name="ninja-3.7d"/>
+		<part name="ninja-4.7e"/>
+	</rom>
+</misterromdescription>
