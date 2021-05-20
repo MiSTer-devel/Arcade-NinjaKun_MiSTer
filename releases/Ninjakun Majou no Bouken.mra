@@ -1,0 +1,61 @@
+<misterromdescription>
+	<name>Ninjakun Majou no Bouken</name>
+	<region></region>
+	<homebrew>no</homebrew>
+	<bootleg>no</bootleg>
+	<version></version>
+	<alternative></alternative>
+	<platform></platform>
+	<series></series>
+	<year>1984</year>
+	<manufacturer>UPL</manufacturer>
+	<manufacturer>Taito</manufacturer>
+	<category>Platform - Climb</category>
+
+	<setname>ninjakun</setname>
+	<parent>ninjakun</parent>
+	<mameversion>0220</mameversion>
+	<rbf>ninjakun</rbf>
+	<about author="MrX-8B" source="https://github.com/MiSTer-devel/Arcade-NinjaKun_MiSTer" twitter="@MrX_8B" webpage="https://patreon.com/MrX_8B"></about>
+
+	<resolution>15kHz</resolution>
+	<rotation>horizontal</rotation>
+	<flip></flip>
+
+	<players>2 (alternating)</players>
+	<joystick>2-way horizontal</joystick>
+	<special_controls></special_controls>
+	<num_buttons>2</num_buttons>
+	<button_names></button_names>
+
+	<switches></switches>
+
+	<rom index="1"></rom>
+	<rom index="0" zip="ninjakun.zip" md5="99e80f22f7a77cf1d574ce89486b385f">
+		<part crc="a74c4297" name="ninja-6.7n"/>
+		<part crc="53a72039" name="ninja-7.7p"/>
+		<part crc="4a99d857" name="ninja-8.7s"/>
+		<part crc="dede49e4" name="ninja-9.7t"/>
+		<part crc="0d55664a" name="ninja-10.2c"/>
+		<part crc="12ff9597" name="ninja-11.2d"/>
+		<part crc="e9b75807" name="ninja-12.4c"/>
+		<part crc="1760ed2c" name="ninja-13.4d"/>
+		<part crc="1c1dc141" name="ninja-1.7a"/>
+		<part crc="39cc7d37" name="ninja-2.7b"/>
+		<part crc="d542bfe3" name="ninja-3.7d"/>
+		<part crc="a57385c6" name="ninja-4.7e"/>
+		<part crc="164a42c4" name="ninja-5.7h"/>
+		<part crc="39cc7d37" name="ninja-2.7b"/>
+		<part crc="d542bfe3" name="ninja-3.7d"/>
+		<part crc="a57385c6" name="ninja-4.7e"/>
+	</rom>
+	<rom index="2"></rom>
+	<rom index="3"></rom>
+	<rom index="4"></rom>
+
+	<nvram></nvram>
+
+	<remark></remark>
+
+	<mratimestamp>20210430005030</mratimestamp>
+</misterromdescription>
