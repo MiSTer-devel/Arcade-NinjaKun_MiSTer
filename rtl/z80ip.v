@@ -10,7 +10,8 @@ module Z80IP
 	output			rd,
 	output			wr,
 	input				intreq,
-	output			intack
+	output			intack,
+	input				pause
 );
 
 assign intack = (adr==16'h38);
@@ -32,7 +33,7 @@ T80s cpu(
 	.A(adr),
 	.DI(data_in),
 	.DO(data_out),
-	.WAIT_n(1'b1),
+	.WAIT_n(~pause),
 	.BUSRQ_n(1'b1),
 	.BUSAK_n(),
 	.HALT_n(),

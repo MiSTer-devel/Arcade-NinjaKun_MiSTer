@@ -8,6 +8,18 @@
 	<category>Fighter / Asian</category>
 	<category>Platform</category>
 	<rbf>ninjakun</rbf>
+	<switches default="FC,C7">
+		<dip bits="0" name="Cabinet" ids="Upright,Cocktail"/>
+		<dip bits="1,2" name="Lives" ids="5,2,3,4"/>
+		<dip bits="3" name="First Bonus" ids="40000,30000"/>
+		<dip bits="4,5" name="Second Bonus" ids="No Bonus,Every 90000,Every 70000,Every 50000"/>
+		<dip bits="6" name="Demo Sounds" ids="No,Yes"/>
+		<dip bits="7" name="Difficulty" ids="Hard,Normal"/>
+		<dip bits="11" name="High Score Names" ids="3 Letters,8 Letters"/>
+		<dip bits="12" name="Allow Continue" ids="Yes,No"/>
+		<dip bits="14" name="Free Play" ids="Yes,No"/>
+		<dip bits="15" name="Infinite Lives" ids="No,Yes"/>
+	</switches>
 	<rom index="0" zip="ninjakun.zip" md5="99e80f22f7a77cf1d574ce89486b385f">
 		<part crc="a74c4297" name="ninja-6.7n"/>
 		<part crc="53a72039" name="ninja-7.7p"/>
@@ -26,4 +38,12 @@
 		<part crc="d542bfe3" name="ninja-3.7d"/>
 		<part crc="a57385c6" name="ninja-4.7e"/>
 	</rom>
+	<rom index="3" md5="none">
+		<part>
+		17 00 00 00 00 FF 00 02 00 02 00 01 00 FF 00 00
+		00 00 E0 A3 00 37 00 20
+		00 00 C0 8C 00 07 22 10
+		</part>
+	</rom>
+	<nvram index="4" size="62"/>
 </misterromdescription>
