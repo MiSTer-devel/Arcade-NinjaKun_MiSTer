@@ -29,7 +29,15 @@ module NINJAKUN_IO_VIDEO
 	input				ROMCL,
 	input  [16:0]	ROMAD,
 	input   [7:0]	ROMDT,
-	input				ROMEN
+	input				ROMEN,
+
+	input				pause,
+
+	input	 [15:0]	hs_address,
+	input	 [7:0]	hs_data_in,
+	output [7:0]	hs_data_out,
+	input				hs_write,
+	input				hs_access
 );
 
 wire  [9:0]	FGVAD;
@@ -60,7 +68,16 @@ wire  [7:0] PSDAT, FGDAT, BGDAT, SPDAT, PLDAT;
 wire  [9:0] BGOFS =  CPADR[9:0]+{SCRPY[7:3],SCRPX[7:3]};
 wire [10:0] BGADR = {CPADR[10],BGOFS};
 
-VDPRAM400x2	fgv( SHCLK, CPADR[10:0], CS_FGV & CPWRT, CPODT, FGDAT, VRCLK, FGVAD, FGVDT );
+// Hiscore mux into foreground video RAM
+wire			fgv_CLK = hs_access ? ROMCL : SHCLK;
+wire [10:0]	fgv_ADR = hs_access ? hs_address[10:0] : CPADR[10:0];
+wire			fgv_WRT = hs_access ? hs_write : (CS_FGV & CPWRT);
+wire  [7:0]	fgv_DIN = hs_access ? hs_data_in : CPODT;
+wire  [7:0]	fgv_DOUT;
+assign hs_data_out = hs_access ? fgv_DOUT : 8'h00;
+assign FGDAT = hs_access ? 8'h00 : fgv_DOUT;
+
+VDPRAM400x2	fgv( fgv_CLK, fgv_ADR, fgv_WRT, fgv_DIN, fgv_DOUT, VRCLK, FGVAD, FGVDT );
 VDPRAM400x2	bgv( SHCLK, BGADR      , CS_BGV & CPWRT, CPODT, BGDAT, VRCLK, BGVAD, BGVDT );
 DPRAM800		spa( SHCLK, CPADR[10:0], CS_SPA & CPWRT, CPODT, SPDAT, VRCLK, SPAAD, 1'b0, 8'h0, SPADT );
 DPRAM200		pal( SHCLK, CPADR[ 8:0], CS_PAL & CPWRT, CPODT, PLDAT,  VCLK, PALET, 1'b0, 8'h0, POUT  );

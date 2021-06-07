@@ -26,11 +26,28 @@ module FPGA_NINJAKUN
 	input				ROMCL,		// Downloaded ROM image
 	input  [16:0] 	ROMAD,
 	input   [7:0]	ROMDT,
-	input				ROMEN
+	input				ROMEN,
+
+	output			CLK24M,
+
+	input				pause,
+
+	input	 [15:0]	hs_address,
+	input	 [7:0]	hs_data_in,
+	output [7:0]	hs_data_out,
+	input				hs_write,
+	input				hs_access
 );
 
+// Hiscore
+wire [7:0]	hs_data_out_ram;
+wire [7:0]	hs_data_out_vram;
+wire			hs_cs_ram = (hs_address[15:13] == 3'b111);
+wire			hs_cs_vram = (hs_address[15:13] == 3'b110);
+assign		hs_data_out = hs_cs_ram ? hs_data_out_ram : hs_data_out_vram;
+
 wire			VCLKx4, VCLK;
-wire			VRAMCL, CLK24M, CLK12M, CLK6M, CLK3M;
+wire			VRAMCL, CLK12M, CLK6M, CLK3M;
 NINJAKUN_CLKGEN clkgen
 (
 	MCLK,
@@ -45,7 +62,10 @@ wire        CPRED, CPWRT, VBLK;
 NINJAKUN_MAIN main (
 	RESET, CLK24M, CLK3M, VBLK, CTR1, CTR2, 
 	CPADR, CPODT, CPIDT, CPRED, CPWRT,
-	ROMCL, ROMAD, ROMDT, ROMEN
+	ROMCL, ROMAD, ROMDT, ROMEN,
+	pause,
+	
+	hs_address,hs_data_in,hs_data_out_ram,hs_write & hs_cs_ram,hs_access
 );
 
 wire  [9:0] FGVAD, BGVAD;
@@ -56,12 +76,20 @@ wire  [8:0] PALET;
 wire  [7:0] SCRPX, SCRPY;
 
 NINJAKUN_IO_VIDEO iovid (
-   CLK24M,CLK3M,RESET,
-	VRAMCL,VCLKx4,VCLK,PH,PV,
-	CPADR,CPODT,CPIDT,CPRED,CPWRT,
- 	DSW1,DSW2,
-	VBLK,POUT,SNDOUT,
-	ROMCL,ROMAD,ROMDT,ROMEN
+	.SHCLK(CLK24M),
+	.CLK3M(CLK3M),
+	.RESET(RESET),
+	.VRCLK(VRAMCL),.VCLKx4(VCLKx4),.VCLK(VCLK),.PH(PH),.PV(PV),
+	.CPADR(CPADR),.CPODT(CPODT),.CPIDT(CPIDT),.CPRED(CPRED),.CPWRT(CPWRT),
+	.DSW1(DSW1),.DSW2(DSW2),
+	.VBLK(VBLK),.POUT(POUT),.SNDOUT(SNDOUT),
+	.ROMCL(ROMCL),.ROMAD(ROMAD),.ROMDT(ROMDT),.ROMEN(ROMEN),
+
+	.hs_address(hs_address),
+	.hs_data_in(hs_data_in),
+	.hs_data_out(hs_data_out_vram),
+	.hs_write(hs_write & hs_cs_vram),
+	.hs_access(hs_access)
 );
 
 endmodule
@@ -86,7 +114,15 @@ module NINJAKUN_MAIN
 	input				ROMCL,
 	input  [16:0]	ROMAD,
 	input	  [7:0]	ROMDT,
-	input				ROMEN
+	input				ROMEN,
+
+	input				pause,
+
+	input	 [15:0]	hs_address,
+	input	 [7:0]	hs_data_in,
+	output [7:0]	hs_data_out,
+	input				hs_write,
+	input				hs_access
 );
 
 wire	SHCLK = CLK24M;
@@ -103,8 +139,8 @@ wire  [7:0] CP0DT, CP1DT;
 wire  [7:0]	CP0ID, CP1ID;
 wire			CP0RD, CP1RD;
 wire			CP0WR, CP1WR;
-Z80IP cpu0( RESET, CP0CL, CP0AD, CP0DT, CP0OD, CP0RD, CP0WR, CP0IQ, CP0IQA );
-Z80IP cpu1( RESET, CP1CL, CP1AD, CP1DT, CP1OD, CP1RD, CP1WR, CP1IQ, CP1IQA );
+Z80IP cpu0( RESET, CP0CL, CP0AD, CP0DT, CP0OD, CP0RD, CP0WR, CP0IQ, CP0IQA, pause );
+Z80IP cpu1( RESET, CP1CL, CP1AD, CP1DT, CP1OD, CP1RD, CP1WR, CP1IQ, CP1IQA, 1'b0 );
 
 NINJAKUN_CPUMUX ioshare(
 	SHCLK, CPADR, CPODT, CPIDT, CPRED, CPWRT,
@@ -130,9 +166,18 @@ NJC0ROM cpu0i( SHCLK, CP0AD, ROM0D, ROMCL,ROMAD,ROMDT,ROMEN );
 NJC1ROM cpu1i( SHCLK, CP1AD, ROM1D, ROMCL,ROMAD,ROMDT,ROMEN );
 
 
+// Hiscore mux into cpu 0 working RAM
+//wire			ram_CLK = hs_access ? ROMCL : SHCLK;
+wire [10:0]	ram_ADR = hs_access ? hs_address[10:0] : CP0AD[10:0];
+wire			ram_WRT = hs_access ? hs_write : (CS_SH0 & CP0WR);
+wire  [7:0]	ram_DIN = hs_access ? hs_data_in : CP0OD;
+wire  [7:0]	ram_DOUT;
+assign hs_data_out = hs_access ? ram_DOUT : 8'h00;
+assign SHDT0 = hs_access ? 8'h00 : ram_DOUT;
+
 wire [7:0] SHDT0, SHDT1;
 DPRAM800	shmem(
-	SHCLK, {  CP0AD[10] ,CP0AD[9:0]}, CS_SH0 & CP0WR, CP0OD, SHDT0,
+	SHCLK, ram_ADR, ram_WRT, ram_DIN, ram_DOUT,
 	SHCLK, {(~CP1AD[10]),CP1AD[9:0]}, CS_SH1 & CP1WR, CP1OD, SHDT1
 );
 

@@ -25,8 +25,9 @@ module emu
 	output        CE_PIXEL,
 
 	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
-	output [11:0] VIDEO_ARX,
-	output [11:0] VIDEO_ARY,
+	//if VIDEO_ARX[12] or VIDEO_ARY[12] is set then [11:0] contains scaled size instead of aspect ratio.
+	output [12:0] VIDEO_ARX,
+	output [12:0] VIDEO_ARY,
 
 	output  [7:0] VGA_R,
 	output  [7:0] VGA_G,
@@ -38,8 +39,29 @@ module emu
 	output [1:0]  VGA_SL,
 	output        VGA_SCALER, // Force VGA scaler
 
+	input  [11:0] HDMI_WIDTH,
+	input  [11:0] HDMI_HEIGHT,
+	output        HDMI_FREEZE,
 
+`ifdef MISTER_FB
+	// Use framebuffer in DDRAM (USE_FB=1 in qsf)
+	// FB_FORMAT:
+	//    [2:0] : 011=8bpp(palette) 100=16bpp 101=24bpp 110=32bpp
+	//    [3]   : 0=16bits 565 1=16bits 1555
+	//    [4]   : 0=RGB  1=BGR (for 16/24/32 modes)
+	//
+	// FB_STRIDE either 0 (rounded to 256 bytes) or multiple of pixel size (in bytes)
+	output        FB_EN,
+	output  [4:0] FB_FORMAT,
+	output [11:0] FB_WIDTH,
+	output [11:0] FB_HEIGHT,
+	output [31:0] FB_BASE,
+	output [13:0] FB_STRIDE,
+	input         FB_VBL,
+	input         FB_LL,
+	output        FB_FORCE_BLANK,
 
+`ifdef MISTER_FB_PALETTE
 	// Palette control for 8bit modes.
 	// Ignored for other video modes.
 	output        FB_PAL_CLK,
@@ -47,6 +69,8 @@ module emu
 	output [23:0] FB_PAL_DOUT,
 	input  [23:0] FB_PAL_DIN,
 	output        FB_PAL_WR,
+`endif
+`endif
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
@@ -56,10 +80,73 @@ module emu
 	output  [1:0] LED_POWER,
 	output  [1:0] LED_DISK,
 
+	// I/O board button press simulation (active high)
+	// b[1]: user button
+	// b[0]: osd button
+	output  [1:0] BUTTONS,
+
 	input         CLK_AUDIO, // 24.576 MHz
 	output [15:0] AUDIO_L,
 	output [15:0] AUDIO_R,
 	output        AUDIO_S,   // 1 - signed audio samples, 0 - unsigned
+	output  [1:0] AUDIO_MIX, // 0 - no mix, 1 - 25%, 2 - 50%, 3 - 100% (mono)
+
+	//ADC
+	inout   [3:0] ADC_BUS,
+
+	//SD-SPI
+	output        SD_SCK,
+	output        SD_MOSI,
+	input         SD_MISO,
+	output        SD_CS,
+	input         SD_CD,
+
+	//High latency DDR3 RAM interface
+	//Use for non-critical time purposes
+	output        DDRAM_CLK,
+	input         DDRAM_BUSY,
+	output  [7:0] DDRAM_BURSTCNT,
+	output [28:0] DDRAM_ADDR,
+	input  [63:0] DDRAM_DOUT,
+	input         DDRAM_DOUT_READY,
+	output        DDRAM_RD,
+	output [63:0] DDRAM_DIN,
+	output  [7:0] DDRAM_BE,
+	output        DDRAM_WE,
+
+	//SDRAM interface with lower latency
+	output        SDRAM_CLK,
+	output        SDRAM_CKE,
+	output [12:0] SDRAM_A,
+	output  [1:0] SDRAM_BA,
+	inout  [15:0] SDRAM_DQ,
+	output        SDRAM_DQML,
+	output        SDRAM_DQMH,
+	output        SDRAM_nCS,
+	output        SDRAM_nCAS,
+	output        SDRAM_nRAS,
+	output        SDRAM_nWE,
+
+`ifdef MISTER_DUAL_SDRAM
+	//Secondary SDRAM
+	//Set all output SDRAM_* signals to Z ASAP if SDRAM2_EN is 0
+	input         SDRAM2_EN,
+	output        SDRAM2_CLK,
+	output [12:0] SDRAM2_A,
+	output  [1:0] SDRAM2_BA,
+	inout  [15:0] SDRAM2_DQ,
+	output        SDRAM2_nCS,
+	output        SDRAM2_nCAS,
+	output        SDRAM2_nRAS,
+	output        SDRAM2_nWE,
+`endif
+
+	input         UART_CTS,
+	output        UART_RTS,
+	input         UART_RXD,
+	output        UART_TXD,
+	output        UART_DTR,
+	input         UART_DSR,
 
 	// Open-drain User port.
 	// 0 - D+/RX
@@ -67,18 +154,30 @@ module emu
 	// 2..6 - USR2..USR6
 	// Set USER_OUT to 1 to read from USER_IN.
 	input   [6:0] USER_IN,
-	output  [6:0] USER_OUT
+	output  [6:0] USER_OUT,
+
+	input         OSD_STATUS
 );
 
-assign VGA_F1    = 0;
-assign VGA_SCALER= 0;
-assign USER_OUT  = '1;
+///////// Default values for ports not used in this core /////////
+
+assign ADC_BUS  = 'Z;
+assign USER_OUT = '1;
+assign {UART_RTS, UART_TXD, UART_DTR} = 0;
+assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
+assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
+assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;  
+
+assign VGA_F1 = 0;
+assign VGA_SCALER = 0;
+assign HDMI_FREEZE = 0;
+
+assign AUDIO_MIX = 0;
+
 assign LED_USER  = ioctl_download;
-assign LED_DISK  = 0;
+assign LED_DISK = 0;
 assign LED_POWER = 0;
-
-
-assign {FB_PAL_CLK,  FB_PAL_ADDR, FB_PAL_DOUT, FB_PAL_WR} = '0;
+assign BUTTONS = 0;
 
 wire [1:0] ar = status[20:19];
 
@@ -90,49 +189,33 @@ assign VIDEO_ARY =  (!ar) ? ( 8'd3) : 12'd0;
 `include "build_id.v" 
 localparam CONF_STR = {
 	"A.NinjaKun;;",
-        "H0OJK,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-	"H0O1,Aspect Ratio,Original,Wide;",
+	"H0OJK,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O35,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"-;",
-	"O8,Difficulty,Normal,Hard;",
-	"O9A,Lives,4,3,2,5;",
-	"OB,1st Extra,30000,40000;",
-	"OCD,2nd Extra (Every),50000,70000,90000,None;",
-	"OF,Allow Continue,No,Yes;",
-	"OG,Free Play,No,Yes;",
-	"OH,Endless(If Free Play),No,Yes;",
-	"OE,Demo Sound,Off,On;",
-	"OI,Name Letters,8,3;",
+	"DIP;",
+	"-;",
+	"P1,Pause options;",
+	"P1OP,Pause when OSD is open,On,Off;",
+	"P1OQ,Dim video after 10s,On,Off;",
 	"-;",
 	"R0,Reset;",
-	"J1,Shot,Jump,Start 1P,Start 2P,Coin;",
-	"jn,A,B,Start,Select,R;",
+	"J1,Shot,Jump,Start 1P,Start 2P,Coin,Pause;",
+	"jn,A,B,Start,Select,R,L;",
+	"jp,B,A,Start,,Select;",
 	"V,v",`BUILD_DATE
 };
 
-
-`define CABINET			1'b0				// Upright=0,Table=1
-`define DIFFICULTY		~status[8]		// Hard=0,Normal=1
-`define LIVES				~status[10:9]	// 00=5,01=2,10=3,11=4
-`define EXTEND1ST			~status[11]		// 40000=0,30000=1
-`define EXTEND2ND			~status[13:12]	// None,30000,50000,70000
-`define DEMOSOUND			~status[14]		// On=0,Off=1
-
-`define ALLOW_CONTINUE	~status[15]		// Yes=0,NO=1
-`define FREEPLAY			~status[16]		// Yes=0,No=1
-`define ENDLESS			~status[17]		// Yes=0,No=1 (If FreePlay)
-`define NAMELETTERS 		~status[18]		// 3Letters=0,8Letters=1
-`define COINAGE			3'b111			// 1C/1C
-
-
-wire bCabinet  = `CABINET; 	// (upright only)
-
+// Read DIPs from MRA
+reg [7:0] m_dip[8];	// Active-LOW
+always @(posedge clk_sys) if(ioctl_wr && (ioctl_index==254) && !ioctl_addr[24:3]) m_dip[ioctl_addr[2:0]] <= ioctl_dout;
+wire bCabinet  = m_dip[0][0]; 	// (upright only)
 
 ////////////////////   CLOCKS   ///////////////////
 
 wire clk_48M;
 wire clk_hdmi = clk_48M;
-wire clk_sys = clk_48M;
+wire clk_sys = clk_24M;
+wire clk_24M;
 
 pll pll
 (
@@ -149,19 +232,21 @@ wire        forced_scandoubler;
 wire        direct_video;
 
 wire        ioctl_download;
+wire        ioctl_upload;
 wire        ioctl_wr;
 wire [24:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
+wire  [7:0] ioctl_din;
+wire  [7:0] ioctl_index;
+wire        ioctl_wait;
 
 wire [15:0] joystk1, joystk2;
 wire [21:0] gamma_bus;
 
-hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
+hps_io #(CONF_STR) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
-
-	.conf_str(CONF_STR),
 
 	.buttons(buttons),
 	.status(status),
@@ -171,9 +256,13 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.direct_video(direct_video),
 
 	.ioctl_download(ioctl_download),
+	.ioctl_upload(ioctl_upload),
 	.ioctl_wr(ioctl_wr),
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
+	.ioctl_din(ioctl_din),
+	.ioctl_index(ioctl_index),
+	.ioctl_wait(ioctl_wait),
 
 	.joystick_0(joystk1),
 	.joystick_1(joystk2)
@@ -201,6 +290,18 @@ wire m_coin1   = joystk1[8];
 wire m_coin2   = joystk2[8];
 wire m_coin    = m_coin1|m_coin2;
 
+wire m_pause   = joystk1[9] | joystk2[9];
+
+// PAUSE SYSTEM
+wire				pause_cpu;
+wire [11:0]		rgb_out;
+pause #(4,4,4,40) pause (
+	.*,
+	.reset(iRST),
+	.user_button(m_pause),
+	.pause_request(hs_pause),
+	.options(~status[26:25])
+);
 
 ///////////////////////////////////////////////////
 
@@ -215,7 +316,7 @@ arcade_video#(256,12) arcade_video
 
 	.clk_video(clk_hdmi),
 
-	.RGB_in({r,g,b}),
+	.RGB_in(rgb_out),
 	.HBlank(hblank),
 	.VBlank(vblank),
 	.HSync(~hs),
@@ -242,14 +343,14 @@ assign AUDIO_S = 1'b0; // unsigned
 
 
 ///////////////////////////////////////////////////
-
-wire  [7:0] iDSW1 =  {`DIFFICULTY,`DEMOSOUND,`EXTEND2ND,`EXTEND1ST,`LIVES, `CABINET};	// 8'b1_0_01_1_10_0;
-wire  [7:0] iDSW2 =  {`ENDLESS,`FREEPLAY,1'b0,`ALLOW_CONTINUE,`NAMELETTERS,`COINAGE};	// 8'b1_1_0_0_1_111; 
+wire  [7:0] iDSW1 =  m_dip[0];
+wire  [7:0] iDSW2 =  m_dip[1];
 
 wire  [7:0] iCTR1 = ~{     2'b11,    m_start1, 1'b0, m_trig11, m_trig12, m_right1, m_left1 };
 wire  [7:0] iCTR2 = ~{ ~m_coin,1'b1, m_start2, 1'b0, m_trig21, m_trig22, m_right2, m_left2 };
 
-wire			iRST  = RESET | status[0] | buttons[1] | ioctl_download;
+wire			rom_download = ioctl_download & ioctl_index == 1'b0;
+wire			iRST  = RESET | status[0] | buttons[1] | rom_download;
 
 wire  [7:0] oPIX;
 assign		POUT = {{oPIX[7:6],oPIX[1:0]},{oPIX[5:4],oPIX[1:0]},{oPIX[3:2],oPIX[1:0]}};
@@ -266,7 +367,42 @@ FPGA_NINJAKUN GameCore
 	.PCLK(PCLK),.POUT(oPIX),
 	.SNDOUT(AOUT),
 
-	.ROMCL(clk_sys),.ROMAD(ioctl_addr),.ROMDT(ioctl_dout),.ROMEN(ioctl_wr)
+	.ROMCL(clk_sys),.ROMAD(ioctl_addr),.ROMDT(ioctl_dout),.ROMEN(ioctl_wr & rom_download),
+
+	.CLK24M(clk_24M),
+
+	.pause(pause_cpu),
+
+	.hs_address(hs_address),
+	.hs_data_out(ioctl_din),
+	.hs_data_in(hs_data_in),
+	.hs_write(hs_write),
+	.hs_access(hs_access)
+);
+
+// HISCORE SYSTEM
+// --------------
+
+wire [15:0]hs_address;
+wire [7:0]hs_data_in;
+wire hs_write;
+wire hs_access;
+wire hs_pause;
+
+hiscore #(
+	.HS_ADDRESSWIDTH(16),
+	.CFG_ADDRESSWIDTH(3),
+	.CFG_LENGTHWIDTH(2)
+) hi (
+	.*,
+	.clk(clk_sys),
+	.paused(pause_cpu),
+	.reset(iRST),
+	.ram_address(hs_address),
+	.data_to_ram(hs_data_in),
+	.ram_write(hs_write),
+	.ram_access(hs_access),
+	.pause_cpu(hs_pause)
 );
 
 endmodule
