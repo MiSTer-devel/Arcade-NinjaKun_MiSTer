@@ -2,9 +2,9 @@
 
 module NINJAKUN_VIDEO
 (
-	input					RESET,
-	input					VCLKx4,
-	input					VCLK,
+	input				RESET,
+	input				VCLKx4,
+	input				VCLK,
 	
 	input   [8:0]		PH,
 	input   [8:0]		PV,
@@ -23,13 +23,15 @@ module NINJAKUN_VIDEO
 	input   [7:0]		SPADT,
 
 	output				VBLK,
-	input					DBGPD,	// Palet Display (for Debug)
+	input				DBGPD,	// Palet Display (for Debug)
 
-	input					ROMCL,
+	input				ROMCL,
 	input  [16:0]		ROMAD,
 	input   [7:0]		ROMDT,
-	input					ROMEN
+	input				ROMEN,
+	input   [1:0]       HWTYPE
 );
+`include "rtl/defs.v"
 
 assign VBLK = (PV>=193);
 
@@ -53,19 +55,20 @@ NJBGROM bgrom(  ~VCLK, BGCAD, BGCDT, ROMCL, ROMAD, ROMDT, ROMEN);
 wire		  FGPRI;
 wire [8:0] FGOUT;
 NINJAKUN_FG fg(
-	VCLK,
+	VCLK, HWTYPE,
 	PH, PV,
 	FGVAD, FGVDT,
 	FGCAD, FGCDT,
   {FGPRI, FGOUT}
 );
-wire FGOPQ =(FGOUT[3:0]!=0);
-wire FGPPQ = FGOPQ & (~FGPRI);
+
+wire FGOPQ = HWTYPE != `HW_PKUNWAR & (FGOUT[3:0]!=0);
+wire FGPPQ = HWTYPE != `HW_PKUNWAR & FGOPQ & (~FGPRI);
 
 // Back-Ground Scanline Generator
 wire [8:0] BGOUT;
 NINJAKUN_BG bg(
-	VCLK,
+	VCLK,HWTYPE,
 	PH, PV,
 	BGSCX, BGSCY,
 	BGVAD, BGVDT,
@@ -76,7 +79,7 @@ NINJAKUN_BG bg(
 // Sprite Scanline Generator
 wire [8:0] SPOUT;
 NINJAKUN_SP sp(
-	VCLKx4, VCLK,
+	VCLKx4, VCLK, (HWTYPE == `HW_PKUNWAR || HWTYPE == `HW_RAIDERS5),
 	PH, PV,
 	SPAAD, SPADT,
 	SPCAD, SPCDT, SPCFT,
@@ -101,8 +104,8 @@ endmodule
 // ForeGround Scanline Generator
 module NINJAKUN_FG
 (
-	input					VCLK,
-
+	input				VCLK,
+	input   [1:0]       HWTYPE,
 	input   [8:0]		PH,		// CRTC
 	input	  [8:0]		PV,
 
@@ -118,14 +121,14 @@ module NINJAKUN_FG
 wire  [8:0] POSH  = PH+8+1;
 wire  [8:0] POSV  = PV+32;
 
-wire  [9:0] CHRNO = {1'b0,FGVDT[13],FGVDT[7:0]};
+wire  [9:0] CHRNO = (HWTYPE == `HW_RAIDERS5 || HWTYPE == `HW_NOVA2001) ? {2'b00, FGVDT[7:0]} : {1'b0,FGVDT[13],FGVDT[7:0]};
 reg  [31:0] CDT;
 
 reg   [4:0] PAL;
 reg   [3:0] OUT;
 always @( posedge VCLK ) begin
 	case(POSH[2:0])
-	 0: begin OUT <= CDT[7:4]  ; PAL   <= FGVDT[12:8]; end
+	 0: begin OUT <= CDT[7:4]  ; PAL   <= HWTYPE == `HW_RAIDERS5 ? {1'b0, FGVDT[15:12]} : FGVDT[12:8]; end
 	 1: begin OUT <= CDT[3:0]  ; FGVAD <= {POSV[7:3],POSH[7:3]}; end
 	 2: begin OUT <= CDT[15:12]; end
 	 3: begin OUT <= CDT[11:8] ; end
@@ -136,7 +139,7 @@ always @( posedge VCLK ) begin
 	endcase
 end
 
-assign FGOUT = { PAL[4], 1'b0, PAL[3:0], OUT }; 
+assign FGOUT = HWTYPE == `HW_NOVA2001 ? (OUT == 4'h1 ? PAL : { PAL[4], OUT }) : { PAL[4], 1'b0, PAL[3:0], OUT };
 
 endmodule
 
@@ -144,7 +147,8 @@ endmodule
 // BackGround Scanline Generator
 module NINJAKUN_BG
 (
-	input					VCLK,
+	input				VCLK,
+	input [1:0]         HWTYPE,
 
 	input   [8:0]		PH,		// CRTC
 	input	  [8:0]		PV,
@@ -160,18 +164,24 @@ module NINJAKUN_BG
 	
 	output  [8:0]		BGOUT		// OUTPUT
 );
+wire  [8:0] POSH  = PH+BGSCX+((HWTYPE == `HW_NOVA2001 || HWTYPE == `HW_PKUNWAR) ? 9'd9 : 9'd2) /* synthesis keep */;
+wire  [8:0] POSV  = PV+BGSCY+9'd32;
 
-wire  [8:0] POSH  = PH+BGSCX+2;
-wire  [8:0] POSV  = PV+BGSCY+32;
+wire  [10:0] CHRNO = HWTYPE == `HW_RAIDERS5 ? {2'b10, BGVDT[8:0]} : 
+                     HWTYPE == `HW_NOVA2001 ? {3'b110, BGVDT[7:0]}:
+					 HWTYPE == `HW_PKUNWAR  ? BGVDT[10:0]:
+                     {1'b1,BGVDT[15:14],BGVDT[7:0]};
 
-wire  [9:0] CHRNO = {BGVDT[15:14],BGVDT[7:0]};
 reg  [31:0] CDT;
 
 reg   [3:0] PAL;
 reg   [3:0] OUT;
 always @( posedge VCLK ) begin
 	case(POSH[2:0])
-	 0: begin OUT <= CDT[7:4]  ; PAL   <= BGVDT[11:8]; end
+	0: begin OUT <= CDT[7:4]  ;
+			PAL   <= (HWTYPE == `HW_RAIDERS5 || HWTYPE == `HW_PKUNWAR) ? BGVDT[15:12] : BGVDT[11:8];
+			//BGPRI <= HWTYPE == `HW_PKUNWAR && BGVDT[11];
+		end
 	 1: begin OUT <= CDT[3:0]  ; BGVAD <= {POSV[7:3],POSH[7:3]}; end
 	 2: begin OUT <= CDT[15:12]; end
 	 3: begin OUT <= CDT[11:8] ; end
@@ -182,7 +192,8 @@ always @( posedge VCLK ) begin
 	endcase
 end
 
-assign BGOUT = { 1'b1, PAL, OUT };
+//assign BGOUT = { 1'b1, PAL, OUT };
+assign BGOUT = HWTYPE[1] ? {1'b1, (OUT == 4'h1 ? PAL : OUT)} : { 1'b1, PAL, OUT };
 
 endmodule
 
