@@ -4,6 +4,7 @@ module NINJAKUN_SP
 (
 	input				VCLKx4,
 	input				VCLK,
+	input               RAIDERS5,
 
 	input   [8:0]	PH,
 	input	  [8:0]	PV,
@@ -38,7 +39,7 @@ always @(negedge VCLK) begin
 end
 
 NINJAKUN_SPENG eng (
-	VCLKx4, PH, PV,
+	VCLKx4, RAIDERS5, PH, PV,
 	SPAAD, SPADT,
 	SPCAD, SPCDT, SPCFT,
 	 WPAD,  WPIX, WPEN
@@ -52,6 +53,7 @@ endmodule
 module NINJAKUN_SPENG
 (
 	input				VCLKx4,
+	input         RAIDERS5,
 
 	input	 [8:0]	PH,
 	input  [8:0]	PV,
@@ -73,11 +75,11 @@ reg  [1:0] SPRIX;
 assign	  SPAAD = {SPRNO, 3'h0, SPRIX};
 
 reg  [7:0] ATTR;
-wire [3:0] PALNO = ATTR[3:0];
-wire 		  FLIPH = ATTR[4];
-wire 		  FLIPV = ATTR[5];
-wire 		  XPOSH = ATTR[6];
-wire 		  DSABL = ATTR[7];
+reg [3:0] PALNO ;
+reg 	FLIPH ;
+reg 	FLIPV ;
+reg 	XPOSH ;
+reg 	DSABL ;
 
 reg  [7:0] YPOS;
 reg  [7:0] NV;
@@ -91,7 +93,7 @@ wire [3:0] WOFS = {4{FLIPH}}^(WP[3:0]);
 assign 	  WPAD = {1'b0,XPOS}-{XPOSH,8'h0}+WOFS-1;
 assign 	  WPEN = ~(WP[4]|(WPIX[3:0]==0));
 
-reg  [7:0] PTNO;
+reg  [8:0] PTNO;
 reg		  CRS;
 assign	  SPCAD = {PTNO, LV[3], CRS, LV[2:0]};
 
@@ -141,14 +143,42 @@ always @( posedge VCLKx4 ) begin
 			SPRIX <= 3;
 			STATE <= `FETCH1;
 		end
+	/*	
 	 `FETCH1: begin
-			ATTR   = SPADT; /* ATTR must block assign */
+			ATTR   = SPADT; // ATTR must block assign 
 			SPRIX <= 0;
 			STATE <= YHIT ? `FETCH2 : `NEXT;
 		end
 
 	 `FETCH2: begin
 			PTNO  <= SPADT;
+			SPRIX <= 1;
+			STATE <= `FETCH3;
+		end 
+		*/
+	 `FETCH1: begin
+			if (!RAIDERS5) begin
+				PALNO <= SPADT[3:0];
+				FLIPH <= SPADT[4];
+				FLIPV <= SPADT[5];
+				XPOSH <= SPADT[6];
+				DSABL <= SPADT[7];
+			end else begin
+				PALNO <= SPADT[7:4];
+				DSABL <= SPADT[3];
+				XPOSH <= 0;
+				PTNO[8:6] <= SPADT[2:0];
+			end
+			SPRIX <= 0;
+			STATE <= YHIT ? `FETCH2 : `NEXT;
+		end
+
+	 `FETCH2: begin
+			if (RAIDERS5) begin
+				FLIPH <= SPADT[0];
+				FLIPV <= SPADT[1];
+			end
+			PTNO  <= RAIDERS5 ? { PTNO[8:6], SPADT[7:2] } : SPADT;
 			SPRIX <= 1;
 			STATE <= `FETCH3;
 		end

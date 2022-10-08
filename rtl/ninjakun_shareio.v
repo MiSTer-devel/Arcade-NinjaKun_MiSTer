@@ -21,6 +21,10 @@ module NINJAKUN_IO_VIDEO
 	input   [7:0]  DSW1,
 	input   [7:0]  DSW2,
 
+	input   [7:0]  CTR1,
+	input   [7:0]  CTR2,
+
+
 	output			VBLK,
 	output  [7:0]	POUT,
 
@@ -30,6 +34,8 @@ module NINJAKUN_IO_VIDEO
 	input  [16:0]	ROMAD,
 	input   [7:0]	ROMDT,
 	input				ROMEN,
+	input   [1:0]	HWTYPE,
+	input   CPSEL,
 
 	input				pause,
 
@@ -39,6 +45,7 @@ module NINJAKUN_IO_VIDEO
 	input				hs_write,
 	input				hs_access
 );
+`include "rtl/defs.v"
 
 wire  [9:0]	FGVAD;
 wire [15:0]	FGVDT;
@@ -46,7 +53,12 @@ wire  [9:0]	BGVAD;
 wire [15:0]	BGVDT;
 wire [10:0]	SPAAD;
 wire  [7:0]	SPADT;
-wire  [7:0]	SCRPX, SCRPY;
+
+wire  RAIDERS5 = HWTYPE == `HW_RAIDERS5;
+wire  [7:0]	SCRPX = RAIDERS5 ? SCRPX_CPU : SCRPX_PSG, SCRPY = RAIDERS5 ? SCRPY_CPU : SCRPY_PSG;
+wire  [7:0]	SCRPX_PSG, SCRPY_PSG;
+reg   [7:0] SCRPX_CPU, SCRPY_CPU;
+
 wire  [8:0]	PALET;
 
 NINJAKUN_VIDEO video (
@@ -57,11 +69,11 @@ NINJAKUN_VIDEO video (
 	SPAAD, SPADT,
 	VBLK, 1'b0,
 
-	ROMCL,ROMAD,ROMDT,ROMEN
+	ROMCL,ROMAD,ROMDT,ROMEN,HWTYPE
 );
 
-wire CS_PSG, CS_FGV, CS_BGV, CS_SPA, CS_PAL;
-NINJAKUN_SADEC sadec( CPADR, CS_PSG, CS_FGV, CS_BGV, CS_SPA, CS_PAL );
+wire CS_PSG, CS_FGV, CS_BGV, CS_SPA, CS_PAL,CS_SCRX, CS_SCRY;
+NINJAKUN_SADEC sadec( CPADR, CS_PSG, CS_FGV, CS_BGV, CS_SPA, CS_PAL, CS_SCRX, CS_SCRY, HWTYPE, CPSEL );
 
 wire  [7:0] PSDAT, FGDAT, BGDAT, SPDAT, PLDAT;
 
@@ -93,9 +105,19 @@ DSEL5_8B cpxdsel(
 
 NINJAKUN_PSG psg(
 	SHCLK, CLK3M, CPADR[1:0], CS_PSG, CPWRT, CPODT, PSDAT, RESET, CPRED,
-	DSW1, DSW2, SCRPX, SCRPY,
-	SNDOUT
+	DSW1, DSW2, SCRPX_PSG, SCRPY_PSG,
+	SNDOUT, HWTYPE, CTR1, CTR2, VBLK
 );
+
+always @(posedge SHCLK) begin
+	if (RESET) begin
+		SCRPX_CPU <= 0;
+		SCRPY_CPU <= 0;
+	end else begin
+		if (CS_SCRX) SCRPX_CPU <= CPODT;
+		if (CS_SCRY) SCRPY_CPU <= CPODT;
+	end
+end
 
 endmodule
 
@@ -108,6 +130,7 @@ module NINJAKUN_CPUMUX
 	input   [7:0]	CPIDT,
 	output    		CPRED,
 	output    		CPWRT,
+	output          CPSEL,
 
 	output reg		CP0CL,
 	input  [15:0]	CP0AD,
@@ -123,6 +146,7 @@ module NINJAKUN_CPUMUX
 	input    		CP1RD,
 	input    		CP1WR
 );
+assign     CPSEL = CSIDE;
 
 reg  [7:0] CP0DT, CP1DT;
 reg  [2:0] PHASE;
@@ -157,26 +181,31 @@ endmodule
 
 module NINJAKUN_PSG
 (
-	input				AXSCLK,
-	input				CLK,
+	input			AXSCLK,
+	input			CLK,
 	input	 [1:0]	ADR,
-	input				CS,
-	input				WR,
+	input			CS,
+	input			WR,
 	input	 [7:0]	ID,
 	output [7:0]	OD,
 
-	input				RESET,
-	input				RD,
+	input			RESET,
+	input			RD,
 
 	input	 [7:0]	DSW1,
 	input	 [7:0]	DSW2,
 
-	output [7:0]	SCRPX,
-	output [7:0]	SCRPY,
+	output [7:0]	SCRPX_PSG,
+	output [7:0]	SCRPY_PSG,
 
-	output [15:0]	SNDO
+	output [15:0]	SNDO,
+	input [1:0]	 	HWTYPE,
+	input [7:0] 	CTR1,
+	input [7:0] 	CTR2,
+	input VBLK
 );
 
+`include "rtl/defs.v"
 wire [7:0] OD0, OD1;
 assign OD = ADR[1] ? OD1 : OD0;
 
@@ -187,7 +216,15 @@ reg [1:0] encnt;
 reg ENA;
 always @(posedge AXSCLK) begin
 	ENA <= (encnt==0);
-	encnt <= encnt+1;
+	encnt <= encnt+1'd1;
+	case (HWTYPE)
+	`HW_NINJAKUN, `HW_RAIDERS5:
+		if (encnt == 7) encnt <= 0; // 6 MHz
+	`HW_NOVA2001:
+		if (encnt == 11) encnt <= 0; // 4 MHz
+	default: ; // 3 MHz
+	endcase
+
 	case (S0c)
 	2'd0: SA0 <= S0x;
 	2'd1: SB0 <= S0x;
@@ -201,31 +238,60 @@ always @(posedge AXSCLK) begin
 	default:;
 	endcase
 end
-
-wire psgxad = ~ADR[0];
-wire psg0cs = CS & (~ADR[1]);
+wire psgxad = HWTYPE == `HW_NOVA2001 ? ADR[1] : ~ADR[0];
+wire psg0cs = CS & (HWTYPE == `HW_NOVA2001 ? ~ADR[0] : ~ADR[1]);
 wire psg0bd = psg0cs & (WR|psgxad);
 wire psg0bc = psg0cs & ((~WR)|psgxad);
 
-wire psg1cs = CS & ADR[1];
+wire psg1cs = CS & (HWTYPE == `HW_NOVA2001 ? ADR[0] : ADR[1]);
 wire psg1bd = psg1cs & (WR|psgxad);
 wire psg1bc = psg1cs & ((~WR)|psgxad);
 
+wire [7:0] IOA_PSG0, IOB_PSG0;
+wire [7:0] IOA_PSG1, IOB_PSG1;
+assign SCRPX_PSG = HWTYPE == `HW_NOVA2001 ? IOA_PSG0 : IOA_PSG1;
+assign SCRPY_PSG = HWTYPE == `HW_NOVA2001 ? IOB_PSG0 : IOB_PSG1;
+
+wire IO_TYPE = HWTYPE == `HW_RAIDERS5 || HWTYPE == `HW_PKUNWAR;
+
 YM2149 psg0(
-	.I_DA(ID),.O_DA(OD0),.I_A9_L(~psg0cs),.I_BDIR(psg0bd),.I_BC1(psg0bc),
-	.I_A8(1'b1),.I_BC2(1'b1),.I_SEL_L(1'b0),
-	.O_AUDIO(S0x),.O_CHAN(S0c),
-	.I_IOA(DSW1),.I_IOB(DSW2),
-	.ENA(ENA),.RESET_L(~RESET),.CLK(AXSCLK)
+	.I_DA(ID),
+	.O_DA(OD0),
+	.I_A9_L(~psg0cs),
+	.I_BDIR(psg0bd),
+	.I_BC1(psg0bc),
+	.I_A8(1'b1),
+	.I_BC2(1'b1),
+	.I_SEL_L(1'b0),
+	.O_AUDIO(S0x),
+	.O_CHAN(S0c),
+	.I_IOA(IO_TYPE ? {~VBLK, CTR1[6:0]} : DSW1),
+	.I_IOB(IO_TYPE ? CTR2 : DSW2),
+	.O_IOA(IOA_PSG0),
+	.O_IOB(IOB_PSG0),
+	.ENA(ENA),
+	.RESET_L(~RESET),
+	.CLK(AXSCLK)
 );
 
 YM2149 psg1(
-	.I_DA(ID),.O_DA(OD1),.I_A9_L(~psg1cs),.I_BDIR(psg1bd),.I_BC1(psg1bc),
-	.I_A8(1'b1),.I_BC2(1'b1),.I_SEL_L(1'b0),
-	.O_AUDIO(S1x),.O_CHAN(S1c),
-	.I_IOA(8'd0),.I_IOB(8'd0),
-	.O_IOA(SCRPX),.O_IOB(SCRPY),
-	.ENA(ENA),.RESET_L(~RESET),.CLK(AXSCLK)
+	.I_DA(ID),
+	.O_DA(OD1),
+	.I_A9_L(~psg1cs),
+	.I_BDIR(psg1bd),
+	.I_BC1(psg1bc),
+	.I_A8(1'b1),
+	.I_BC2(1'b1),
+	.I_SEL_L(1'b0),
+	.O_AUDIO(S1x),
+	.O_CHAN(S1c),
+	.I_IOA(HWTYPE == `HW_NINJAKUN ? 8'd0 : DSW1),
+	.I_IOB(HWTYPE == `HW_NINJAKUN ? 8'd0 : DSW2),
+	.O_IOA(IOA_PSG1),
+	.O_IOB(IOB_PSG1),
+	.ENA(ENA),
+	.RESET_L(~RESET),
+	.CLK(AXSCLK)
 );
 
 wire [11:0] SND = SA0+SB0+SC0+SA1+SB1+SC1;
