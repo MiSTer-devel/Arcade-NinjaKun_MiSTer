@@ -358,8 +358,8 @@ assign AUDIO_S = 1'b0; // unsigned
 
 
 ///////////////////////////////////////////////////
-wire  [7:0] iDSW1 =  m_dip[0]; //status[39:32];
-wire  [7:0] iDSW2 =  m_dip[1]; //status[14:7];
+wire  [7:0] iDSW1 =  m_dip[0]; 
+wire  [7:0] iDSW2 =  m_dip[1]; 
 
 wire [7:0]  iCTR1,iCTR2,iCTR3;
 
@@ -389,6 +389,16 @@ wire			iRST  = RESET | status[0] | buttons[1] | rom_download;
 wire  [7:0] oPIX;
 assign		POUT = {{oPIX[7:6],oPIX[1:0]},{oPIX[5:4],oPIX[1:0]},{oPIX[3:2],oPIX[1:0]}};
 
+reg [4:0] PALADR;
+reg PALWR;
+reg [24:0] PALDAT;
+always @(posedge clk_sys) begin
+	if (ioctl_wr) begin
+		PALWR <= ioctl_addr[23:5] == {16'h0180, 3'b000};
+	end
+	PALDAT <= ioctl_dout;
+	PALADR <= ioctl_addr[4:0];
+end
 
 FPGA_NINJAKUN GameCore
 (
@@ -410,11 +420,16 @@ FPGA_NINJAKUN GameCore
 
 	.pause(pause_cpu),
 
+	.PALADR(PALADR),
+	.PALWR(PALWR),
+	.PALDAT(PALDAT),
+
 	.hs_address(hs_address),
 	.hs_data_out(hs_data_out),
 	.hs_data_in(hs_data_in),
 	.hs_write(hs_write_enable),
 	.hs_access(hs_access_read|hs_access_write)
+
 );
 
 // HISCORE SYSTEM

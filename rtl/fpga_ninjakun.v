@@ -34,6 +34,10 @@ module FPGA_NINJAKUN
 
 	input			pause,
 
+	input     [4:0] PALADR,
+	input           PALWR,
+	input     [7:0] PALDAT,
+
 	input	 [15:0]	hs_address,
 	input	 [7:0]	hs_data_in,
 	output [7:0]	hs_data_out,
@@ -90,7 +94,9 @@ NINJAKUN_IO_VIDEO iovid (
 	.VBLK(VBLK),.POUT(POUT),.SNDOUT(SNDOUT),
 	.ROMCL(ROMCL),.ROMAD(ROMAD),.ROMDT(ROMDT),.ROMEN(ROMEN),
 	.HWTYPE(HWTYPE), .CPSEL(CPSEL),
-
+	.PALADR(PALADR),
+	.PALWR(PALWR),
+	.PALDAT(PALDAT),
 	.hs_address(hs_address),
 	.hs_data_in(hs_data_in),
 	.hs_data_out(hs_data_out_vram),
@@ -179,7 +185,7 @@ NJC1ROM cpu1i( SHCLK, CP1AD, ROM1D, ROMCL,ROMAD,ROMDT,ROMEN );
 // Hiscore mux into cpu 0 working RAM
 //wire			ram_CLK = hs_access ? ROMCL : SHCLK;
 wire [10:0]	ram_ADR = hs_access ? hs_address[10:0] : CP0AD[10:0];
-wire			ram_WRT = hs_access ? hs_write : (CS_SH0 & CP0WR);
+wire		ram_WRT = hs_access ? hs_write : (CS_SH0 & CP0WR);
 wire  [7:0]	ram_DIN = hs_access ? hs_data_in : CP0OD;
 wire  [7:0]	ram_DOUT;
 assign hs_data_out = hs_access ? ram_DOUT : 8'h00;

@@ -30,20 +30,23 @@ module NINJAKUN_IO_VIDEO
 
 	output [15:0]	SNDOUT,
 	
-	input				ROMCL,
+	input			ROMCL,
 	input  [16:0]	ROMAD,
 	input   [7:0]	ROMDT,
-	input				ROMEN,
+	input			ROMEN,
 	input   [1:0]	HWTYPE,
 	input   CPSEL,
+	input   [4:0] PALADR,
+	input         PALWR,
+	input   [7:0] PALDAT,
 
-	input				pause,
+	input			pause,
 
 	input	 [15:0]	hs_address,
 	input	 [7:0]	hs_data_in,
 	output [7:0]	hs_data_out,
-	input				hs_write,
-	input				hs_access
+	input			hs_write,
+	input			hs_access
 );
 `include "rtl/defs.v"
 
@@ -75,15 +78,15 @@ NINJAKUN_VIDEO video (
 wire CS_PSG, CS_FGV, CS_BGV, CS_SPA, CS_PAL,CS_SCRX, CS_SCRY;
 NINJAKUN_SADEC sadec( CPADR, CS_PSG, CS_FGV, CS_BGV, CS_SPA, CS_PAL, CS_SCRX, CS_SCRY, HWTYPE, CPSEL );
 
+wire  [9:0] BGOFS =  CPADR[9:0]+{SCRPY[7:3],SCRPX[7:3]};
+wire [10:0] BGADR = HWTYPE[1] ? CPADR[10:0] : {CPADR[10],BGOFS};
+
 wire  [7:0] PSDAT, FGDAT, BGDAT, SPDAT, PLDAT;
 
-wire  [9:0] BGOFS =  CPADR[9:0]+{SCRPY[7:3],SCRPX[7:3]};
-wire [10:0] BGADR = {CPADR[10],BGOFS};
-
 // Hiscore mux into foreground video RAM
-wire			fgv_CLK = hs_access ? ROMCL : SHCLK;
+wire		fgv_CLK = hs_access ? ROMCL : SHCLK;
 wire [10:0]	fgv_ADR = hs_access ? hs_address[10:0] : CPADR[10:0];
-wire			fgv_WRT = hs_access ? hs_write : (CS_FGV & CPWRT);
+wire		fgv_WRT = hs_access ? hs_write : (CS_FGV & CPWRT);
 wire  [7:0]	fgv_DIN = hs_access ? hs_data_in : CPODT;
 wire  [7:0]	fgv_DOUT;
 assign hs_data_out = hs_access ? fgv_DOUT : 8'h00;
@@ -92,7 +95,7 @@ assign FGDAT = hs_access ? 8'h00 : fgv_DOUT;
 VDPRAM400x2	fgv( fgv_CLK, fgv_ADR, fgv_WRT, fgv_DIN, fgv_DOUT, VRCLK, FGVAD, FGVDT );
 VDPRAM400x2	bgv( SHCLK, BGADR      , CS_BGV & CPWRT, CPODT, BGDAT, VRCLK, BGVAD, BGVDT );
 DPRAM800		spa( SHCLK, CPADR[10:0], CS_SPA & CPWRT, CPODT, SPDAT, VRCLK, SPAAD, 1'b0, 8'h0, SPADT );
-DPRAM200		pal( SHCLK, CPADR[ 8:0], CS_PAL & CPWRT, CPODT, PLDAT,  VCLK, PALET, 1'b0, 8'h0, POUT  );
+DPRAM200		pal( SHCLK, CPADR[ 8:0], CS_PAL & CPWRT, CPODT, PLDAT,  VCLK, PALWR ? PALADR : PALET, PALWR, PALDAT, POUT  );
 
 DSEL5_8B cpxdsel(
 	CPIDT,
@@ -187,7 +190,7 @@ module NINJAKUN_PSG
 	input			CS,
 	input			WR,
 	input	 [7:0]	ID,
-	output [7:0]	OD,
+	output   [7:0]	OD,
 
 	input			RESET,
 	input			RD,
@@ -204,10 +207,10 @@ module NINJAKUN_PSG
 	input [7:0] 	CTR2,
 	input VBLK
 );
-
 `include "rtl/defs.v"
+
 wire [7:0] OD0, OD1;
-assign OD = ADR[1] ? OD1 : OD0;
+assign OD = psg1cs ? OD1 : OD0;
 
 reg [7:0] SA0, SB0, SC0; wire [7:0] S0x; wire [1:0] S0c;
 reg [7:0] SA1, SB1, SC1; wire [7:0] S1x; wire [1:0] S1c;
@@ -238,6 +241,7 @@ always @(posedge AXSCLK) begin
 	default:;
 	endcase
 end
+
 wire psgxad = HWTYPE == `HW_NOVA2001 ? ADR[1] : ~ADR[0];
 wire psg0cs = CS & (HWTYPE == `HW_NOVA2001 ? ~ADR[0] : ~ADR[1]);
 wire psg0bd = psg0cs & (WR|psgxad);

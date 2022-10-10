@@ -46,7 +46,7 @@ end
 
 wire [7:0] INPORT0 = CTR1;
 wire [7:0] INPORT1 = CTR2;
-wire [7:0] INPORT2 = HWTYPE[1] ? {~VBLK, CTR3[6:0]} : { 4'b0000, SYNCFLG, ~VBLK,1'b0 };
+wire [7:0] INPORT2 = HWTYPE[1] ? {~VBLK, CTR3[6:0]} : { 4'b0000, SYNCFLG, ~VBLK, 1'b0 };
 
 assign INPD0 = ( AD0 == 0 ) ? INPORT0 :
 					( AD0 == 1 ) ? INPORT1 :

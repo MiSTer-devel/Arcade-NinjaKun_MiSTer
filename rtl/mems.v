@@ -2,15 +2,15 @@
 
 module VDPRAM400x2
 (
-	input				CL0,
-	input [10:0]	AD0,
-	input				WR0,
+	input			CL0,
+	input   [10:0]	AD0,
+	input			WR0,
 	input	 [7:0]	WD0,
-	output [7:0]	RD0,
+	output   [7:0]	RD0,
 
-	input				CL1,
+	input			CL1,
 	input	 [9:0]	AD1,
-	output [15:0]	RD1
+	output  [15:0]	RD1
 );
 
 reg A10;
@@ -28,15 +28,15 @@ endmodule
 module DPRAM800
 (
 	input				CL0,
-	input	[10:0]		AD0,
+	input     [10:0]	AD0,
 	input				WE0,
-	input  [7:0]		WD0,
+	input      [7:0]	WD0,
 	output reg [7:0]	RD0,
 	
 	input				CL1,
-	input	[10:0]		AD1,
+	input	  [10:0]	AD1,
 	input				WE1,
-	input  [7:0]		WD1,
+	input      [7:0]	WD1,
 	output reg [7:0]	RD1
 );
 
@@ -64,15 +64,15 @@ endmodule
 module DPRAM400
 (
 	input				CL0,
-	input	 [9:0]		AD0,
+	input	   [9:0]	AD0,
 	input				WE0,
-	input  [7:0]		WD0,
+	input      [7:0]	WD0,
 	output reg [7:0]	RD0,
 	
 	input				CL1,
-	input	 [9:0]		AD1,
+	input	   [9:0]	AD1,
 	input				WE1,
-	input  [7:0]		WD1,
+	input      [7:0]	WD1,
 	output reg [7:0]	RD1
 );
 
@@ -83,28 +83,30 @@ always @( posedge CL0 ) begin
 		core[AD0] <= WD0;
 	end else 
 		RD0 <= core[AD0];
-
 end
 
 always @( posedge CL1 ) begin
-	if (WE1) begin core[AD1] <= WD1;
-end else RD1 <= core[AD1];end
+	if (WE1) begin 
+		core[AD1] <= WD1;
+	end else 
+		RD1 <= core[AD1];
+end
 
 endmodule
 
 
 module DPRAM200
 (
-	input					CL0,
-	input	 [8:0]		AD0,
-	input					WE0,
-	input  [7:0]		WD0,
+	input				CL0,
+	input	   [8:0]	AD0,
+	input				WE0,
+	input      [7:0]	WD0,
 	output reg [7:0]	RD0,
 	
-	input					CL1,
-	input	 [8:0]		AD1,
-	input					WE1,
-	input  [7:0]		WD1,
+	input				CL1,
+	input	   [8:0]	AD1,
+	input				WE1,
+	input      [7:0]	WD1,
 	output reg [7:0]	RD1
 );
 
