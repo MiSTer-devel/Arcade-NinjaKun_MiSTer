@@ -1,5 +1,5 @@
 set_global_assignment -name VHDL_FILE rtl/YM2149_linmix_sep.vhd
-set_global_assignment -name QIP_FILE rtl/DPRAM1024.qip
+set_global_assignment -name VHDL_FILE rtl/dpram.vhd
 set_global_assignment -name VERILOG_FILE rtl/z80ip.v
 set_global_assignment -name VERILOG_FILE rtl/ninjakun_video.v
 set_global_assignment -name VERILOG_FILE rtl/ninjakun_sprite.v

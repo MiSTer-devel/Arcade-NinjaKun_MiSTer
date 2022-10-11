@@ -2,25 +2,25 @@
 
 module NINJAKUN_SP
 (
-	input				VCLKx4,
-	input				VCLK,
-	input               RAIDERS5,
+	input         VCLKx4,
+	input         VCLK,
+	input         RESET,
+	input         RAIDERS5,
 
-	input   [8:0]	PH,
-	input	  [8:0]	PV,
+	input   [8:0] PH,
+	input   [8:0] PV,
 
-	output [10:0]	SPAAD,
-	input   [7:0]	SPADT,
+	output [10:0] SPAAD,
+	input   [7:0] SPADT,
 
-	output [12:0]	SPCAD,
-	input  [31:0]	SPCDT,
-	input				SPCFT,
+	output [13:0] SPCAD,
+	input  [31:0] SPCDT,
+	input         SPCFT,
 
-	output  [8:0]	SPOUT
+	output  [8:0] SPOUT
 );
-
-wire 		  WPEN;
-wire [8:0] WPAD;
+wire       WPEN;
+wire [7:0] WPAD;
 wire [7:0] WPIX;
 
 reg  [7:0] POUT;
@@ -28,18 +28,21 @@ wire [3:0] OTHP = (POUT[3:0]==1) ? POUT[7:4] : POUT[3:0];
 
 reg  [9:0] radr0=0,radr1=1;
 wire [7:0] POUTi;
-LineDBuf ldbuf(
-	 VCLKx4, radr0, POUTi, (radr0==radr1),
-	~VCLKx4, {PV[0],WPAD}, WPIX, WPEN
-);
-always @(posedge VCLK) radr0 <= {~PV[0],PH};
-always @(negedge VCLK) begin 
-	if (radr0!=radr1) POUT <= POUTi;
-	radr1 <= radr0;
+
+dpram #(8,10) ldbuf(
+	VCLKx4, WPEN, {PV[0], 1'b0, WPAD}, WPIX, 8'd0,
+	VCLKx4, (radr0==radr1), radr0, 8'd0, POUTi);
+
+always @(posedge VCLKx4) begin 
+	radr0 <= {~PV[0],PH};
+	if (VCLK) begin
+		if (radr0!=radr1) POUT <= POUTi;
+		radr1 <= radr0;
+	end
 end
 
 NINJAKUN_SPENG eng (
-	VCLKx4, RAIDERS5, PH, PV,
+	VCLKx4, RESET, RAIDERS5, PH, PV,
 	SPAAD, SPADT,
 	SPCAD, SPCDT, SPCFT,
 	 WPAD,  WPIX, WPEN
@@ -52,34 +55,34 @@ endmodule
 
 module NINJAKUN_SPENG
 (
-	input				VCLKx4,
+	input         VCLKx4,
+	input         RESET,
 	input         RAIDERS5,
 
-	input	 [8:0]	PH,
-	input  [8:0]	PV,
+	input   [8:0] PH,
+	input   [8:0] PV,
 
-	output [10:0]	SPAAD,
-	input  [7:0]	SPADT,
+	output [10:0] SPAAD,
+	input   [7:0] SPADT,
 
-	output [12:0]	SPCAD,
-	input  [31:0]	SPCDT,
-	input				SPCFT,
+	output reg [13:0] SPCAD,
+	input  [31:0] SPCDT,
+	input         SPCFT,
 
-	output [8:0]	WPAD,
-	output [7:0]	WPIX,
-	output			WPEN
+	output [7:0]  WPAD,
+	output [7:0]  WPIX,
+	output        WPEN
 );
 
 reg  [5:0] SPRNO;
 reg  [1:0] SPRIX;
-assign	  SPAAD = {SPRNO, 3'h0, SPRIX};
+assign     SPAAD = {SPRNO, 3'h0, SPRIX};
 
-reg  [7:0] ATTR;
-reg [3:0] PALNO ;
-reg 	FLIPH ;
-reg 	FLIPV ;
-reg 	XPOSH ;
-reg 	DSABL ;
+reg  [3:0] PALNO;
+reg        FLIPH;
+reg        FLIPV;
+reg        XPOSH;
+reg        DSABL;
 
 reg  [7:0] YPOS;
 reg  [7:0] NV;
@@ -90,12 +93,11 @@ wire       YHIT = (HV[7:4]==4'b1111) & (~DSABL);
 reg  [7:0] XPOS;
 reg  [4:0] WP;
 wire [3:0] WOFS = {4{FLIPH}}^(WP[3:0]);
-assign 	  WPAD = {1'b0,XPOS}-{XPOSH,8'h0}+WOFS-1;
-assign 	  WPEN = ~(WP[4]|(WPIX[3:0]==0));
+assign     WPAD = {1'b0,XPOS}-{XPOSH,8'h0}+WOFS-1'd1;
+assign     WPEN = ~(WP[4]|(WPIX[3:0]==0));
 
 reg  [8:0] PTNO;
-reg		  CRS;
-assign	  SPCAD = {PTNO, LV[3], CRS, LV[2:0]};
+reg        CRS;
 
 function [3:0] XOUT;
 input  [2:0] N;
@@ -125,13 +127,19 @@ assign	  WPIX = {PALNO, XOUT(WP[2:0],WP[3] ? CDT1 : CDT0)};
 `define NEXT	7
 
 reg  [2:0] STATE;
+reg        PH8_D;
 always @( posedge VCLKx4 ) begin
+	if (RESET) begin
+		STATE <= `WAIT;
+		SPCAD <= 14'h3fff;
+	end else
 	case (STATE)
 
 	 `WAIT: begin
+			PH8_D <= PH[8];
 			WP <= 16;
-			if (~PH[8]) begin
-				NV <= PV+17;
+			if (PH8_D & ~PH[8]) begin
+				NV <= PV+5'd17;
 				SPRNO <= 0;
 				SPRIX <= 2;
 				STATE <= `FETCH0;
@@ -143,19 +151,6 @@ always @( posedge VCLKx4 ) begin
 			SPRIX <= 3;
 			STATE <= `FETCH1;
 		end
-	/*	
-	 `FETCH1: begin
-			ATTR   = SPADT; // ATTR must block assign 
-			SPRIX <= 0;
-			STATE <= YHIT ? `FETCH2 : `NEXT;
-		end
-
-	 `FETCH2: begin
-			PTNO  <= SPADT;
-			SPRIX <= 1;
-			STATE <= `FETCH3;
-		end 
-		*/
 	 `FETCH1: begin
 			if (!RAIDERS5) begin
 				PALNO <= SPADT[3:0];
@@ -187,6 +182,7 @@ always @( posedge VCLKx4 ) begin
 				XPOS  <= SPADT;
 				CRS   <= 0;
 				STATE <= `FETCH4;
+				SPCAD <= {PTNO, LV[3], 1'b0, LV[2:0]};
 			end
 		end
 	 `FETCH4: begin
@@ -194,6 +190,7 @@ always @( posedge VCLKx4 ) begin
 				if (~CRS) begin
 					CDT0  <= SPCDT;
 					CRS   <= 1;
+					SPCAD <= {PTNO, LV[3], 1'b1, LV[2:0]};
 				end
 				else begin
 					CDT1  <= SPCDT;
@@ -204,43 +201,19 @@ always @( posedge VCLKx4 ) begin
 		end
 
 	 `DRAW: begin
-			WP <= WP+1;
-			if (WP[4]) STATE <= `NEXT;
+			WP <= WP+1'd1;
+			if (&WP[3:0]) STATE <= `NEXT;
  	   end
 
 	 `NEXT: begin
 			CDT0  <= 0; CDT1 <= 0;
-			SPRNO <= SPRNO+1;
+			SPRNO <= SPRNO+1'd1;
 			SPRIX <= 2;
 			STATE <= (SPRNO==63) ? `WAIT : `FETCH0;
 	   end
 
 	endcase
 end
-
-endmodule
-
-
-module LineDBuf
-(
-	input 		 rC,
-	input  [9:0] rA,
-	output [7:0] rD,
-	input			 rE,
-
-	input			 wC,
-	input	 [9:0] wA,
-	input  [7:0] wD,
-	input			 wE
-);
-
-DPRAM1024 ram(
-	rA, wA,
-	rC, wC,
-	8'h0, wD,
-	rE, wE,
-	rD
-);
 
 endmodule
 

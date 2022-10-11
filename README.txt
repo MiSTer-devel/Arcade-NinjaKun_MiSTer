@@ -4,6 +4,7 @@
 -- 23 October 2019
 -- https://github.com/MrX-8B/MiSTer-Arcade-NinjaKun
 -- 
+-- Added support for Raiders5, Nova 2001 from MiST by Mike S
 ---------------------------------------------------------------------------------
 -- FPGA Ninja-Kun for Spartan-6
 ------------------------------------------------
@@ -59,3 +60,14 @@ Quickreference for folders and file placement:
 /_Arcade/cores/<game rbf>.rbf
 /_Arcade/mame/<mame rom>.zip
 /_Arcade/hbmame/<hbmame rom>.zip
+
+Note for Nova 2001 (From Mame)
+
+- nova2001 is very sensitive to coin inputs, if the coin isn't held down long
+  enough, or is held down too long the game will reset, likewise if coins are
+  inserted too quickly. This only happens in nova2001 and not in nova2001u.
+  (the nova2001h set seems to be an unofficial fix for this issue, presumably
+   it's so sensitive it would reset sometimes in the original cabinet?)
+- nova2001h MRA was added to address the original cabinet issue.
+
+
