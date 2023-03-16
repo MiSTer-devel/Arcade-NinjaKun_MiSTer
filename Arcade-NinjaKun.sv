@@ -15,7 +15,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [45:0] HPS_BUS,
+	inout  [48:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -38,6 +38,7 @@ module emu
 	output        VGA_F1,
 	output [1:0]  VGA_SL,
 	output        VGA_SCALER, // Force VGA scaler
+	output 		  VGA_DISABLE,
 
 	input  [11:0] HDMI_WIDTH,
 	input  [11:0] HDMI_HEIGHT,
@@ -168,6 +169,7 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
 assign VGA_F1    = 0;
 assign VGA_SCALER= 0;
+assign VGA_DISABLE = 0;
 assign USER_OUT  = '1;
 assign LED_USER  = ioctl_download;
 assign LED_DISK  = 0;
@@ -178,8 +180,8 @@ assign HDMI_FREEZE = 0;
 
 wire [1:0] ar = status[20:19];
 
-assign VIDEO_ARX =  (!ar) ? ( 8'd4) : (ar - 1'd1);
-assign VIDEO_ARY =  (!ar) ? ( 8'd3) : 12'd0;
+assign VIDEO_ARX =  (!ar) ? ( 13'd1285) : (ar - 1'd1);
+assign VIDEO_ARY =  (!ar) ? ( 13'd939) : 12'd0;
 
 `include "build_id.v" 
 `include "rtl/defs.v"
